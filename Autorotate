@@ -1,6 +1,5 @@
 -- ==========================================
--- SCRIPT DE ROBO CON INCLINACIÓN Y HUNDIMIENTO
--- Colocar en un LocalScript dentro de StarterPlayerScripts
+-- SCRIPT COMPATIBLE CON DELTA EXECUTOR
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -15,19 +14,18 @@ local rootJoint = humanoidRootPart:WaitForChild("RootJoint")
 local originalC0 = rootJoint.C0
 
 -- ==========================================
--- CONFIGURACIÓN DE PARÁMETROS
+-- AJUSTES (CÁMBIALOS A TU GUSTO)
 -- ==========================================
-local INCLINACION_GRADOS = 180 -- Grados de inclinación (180 = boca abajo)
-local HUNDIMIENTO_STUDS = 3.5  -- Profundidad inicial bajo la tierra
-local VELOCIDAD_ROTACION = 360 -- Grados por segundo en la rotación continua
-local TIEMPO_DURACION = 5      -- Duración del efecto en segundos (Ajustable)
+local INCLINACION_GRADOS = 180 -- Grados (180 = boca abajo)
+local HUNDIMIENTO_STUDS = 4.5  -- Qué tanto te hundes bajo el piso
+local VELOCIDAD_ROTACION = 360 -- Velocidad de giro por segundo
+local TECLA_ACTIVAR = Enum.KeyCode.E -- Tecla para encender/apagar en PC
 -- ==========================================
 
 local estaRobando = false
 local conexionRender = nil
 local anguloActualY = 0
 
--- Función para aplicar las transformaciones frame a frame
 local function aplicarTransformacion(deltaTime)
 	anguloActualY = (anguloActualY + math.rad(VELOCIDAD_ROTACION * deltaTime)) % (math.pi * 2)
 	local anguloInclinacion = math.rad(INCLINACION_GRADOS)
@@ -38,77 +36,42 @@ local function aplicarTransformacion(deltaTime)
 	rootJoint.C0 = originalC0 * CFrame.new(offsetPosicion) * offsetRotacion
 end
 
--- Función para ocultar el objeto robado bajo la tierra
-local function ocultarBrainRot(objeto)
-	if not objeto then return end
-	if objeto:IsA("Model") and objeto.PrimaryPart then
-		objeto:SetPrimaryPartCFrame(objeto.PrimaryPart.CFrame * CFrame.new(0, -50, 0))
-	elseif objeto:IsA("BasePart") then
-		objeto.CFrame = objeto.CFrame * CFrame.new(0, -50, 0)
-	end
-	for _, part in ipairs(objeto:GetDescendants()) do
-		if part:IsA("BasePart") or part:IsA("Decal") then
-			part.Transparency = 1
+local function toggleRobo()
+	estaRobando = not estaRobando
+	
+	if estaRobando then
+		-- Iniciar giro y hundimiento
+		conexionRender = RunService.RenderStepped:Connect(function(deltaTime)
+			aplicarTransformacion(deltaTime)
+		end)
+		print("Modo invisible/hundido: ACTIVADO")
+	else
+		-- Apagar y volver a la normalidad
+		if conexionRender then
+			conexionRender:Disconnect()
+			conexionRender = nil
 		end
+		rootJoint.C0 = originalC0
+		anguloActualY = 0
+		print("Modo invisible/hundido: DESACTIVADO")
 	end
-end
-
--- Iniciar el efecto de robo
-local function iniciarRobo(objetoBrainRot)
-	if estaRobando then return end
-	estaRobando = true
-	
-	ocultarBrainRot(objetoBrainRot)
-	
-	conexionRender = RunService.RenderStepped:Connect(function(deltaTime)
-		aplicarTransformacion(deltaTime)
-	end)
-	
-	-- Control del tiempo que permanece en esa posición
-	task.wait(TIEMPO_DURACION)
-	
-	detenerRobo()
-end
-
--- Detener el efecto y restaurar al personaje
-function detenerRobo()
-	if not estaRobando then return end
-	estaRobando = false
-	
-	if conexionRender then
-		conexionRender:Disconnect()
-		conexionRender = nil
-	end
-	
-	rootJoint.C0 = originalC0
-	anguloActualY = 0
 end
 
 -- ==========================================
--- CONTROLES EN VIVO (Flechas del teclado)
+-- ACTIVACIÓN POR TECLA (Para teclado/celular)
 -- ==========================================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	
-	-- Presiona Flecha Abajo para hundirte más
+	-- Presiona E para activar o desactivar cuando estés frente al Brainrot
+	if input.KeyCode == TECLA_ACTIVAR then
+		toggleRobo()
+	end
+	
+	-- Ajustar hundimiento en vivo
 	if input.KeyCode == Enum.KeyCode.Down then
 		HUNDIMIENTO_STUDS = HUNDIMIENTO_STUDS + 0.5
-		print("Hundimiento actual:", HUNDIMIENTO_STUDS)
-		
-	-- Presiona Flecha Arriba para salir más a la superficie
 	elseif input.KeyCode == Enum.KeyCode.Up then
 		HUNDIMIENTO_STUDS = math.max(0, HUNDIMIENTO_STUDS - 0.5)
-		print("Hundimiento actual:", HUNDIMIENTO_STUDS)
 	end
 end)
-
--- ==========================================
--- EJEMPLO DE ACTIVACIÓN CON PROXIMITYPROMPT
--- ==========================================
-local prompt = workspace:FindFirstChild("PromptRobar", true)
-
-if prompt then
-	prompt.Triggered:Connect(function()
-		iniciarRobo(prompt.Parent)
-	end)
-end
