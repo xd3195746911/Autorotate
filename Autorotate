@@ -1,26 +1,25 @@
--- ==========================================
--- SCRIPT COMPATIBLE CON DELTA EXECUTOR
--- ==========================================
+-- Guardar este código tal cual en tu archivo de GitHub
+local task = task or getgenv().task
 
+-- Esperar a que el jugador y el personaje carguen completamente
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-local rootJoint = humanoidRootPart:WaitForChild("RootJoint")
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 10)
+if not humanoidRootPart then return end
+
+local rootJoint = humanoidRootPart:WaitForChild("RootJoint", 10)
+if not rootJoint then return end
 
 local originalC0 = rootJoint.C0
 
--- ==========================================
--- AJUSTES (CÁMBIALOS A TU GUSTO)
--- ==========================================
-local INCLINACION_GRADOS = 180 -- Grados (180 = boca abajo)
-local HUNDIMIENTO_STUDS = 4.5  -- Qué tanto te hundes bajo el piso
-local VELOCIDAD_ROTACION = 360 -- Velocidad de giro por segundo
-local TECLA_ACTIVAR = Enum.KeyCode.E -- Tecla para encender/apagar en PC
--- ==========================================
+-- Parámetros
+local INCLINACION_GRADOS = 180
+local HUNDIMIENTO_STUDS = 4.5
+local VELOCIDAD_ROTACION = 360
 
 local estaRobando = false
 local conexionRender = nil
@@ -29,49 +28,47 @@ local anguloActualY = 0
 local function aplicarTransformacion(deltaTime)
 	anguloActualY = (anguloActualY + math.rad(VELOCIDAD_ROTACION * deltaTime)) % (math.pi * 2)
 	local anguloInclinacion = math.rad(INCLINACION_GRADOS)
-	
 	local offsetPosicion = Vector3.new(0, -HUNDIMIENTO_STUDS, 0)
 	local offsetRotacion = CFrame.Angles(0, anguloActualY, 0) * CFrame.Angles(0, 0, anguloInclinacion)
-	
 	rootJoint.C0 = originalC0 * CFrame.new(offsetPosicion) * offsetRotacion
 end
 
 local function toggleRobo()
 	estaRobando = not estaRobando
-	
 	if estaRobando then
-		-- Iniciar giro y hundimiento
 		conexionRender = RunService.RenderStepped:Connect(function(deltaTime)
 			aplicarTransformacion(deltaTime)
 		end)
-		print("Modo invisible/hundido: ACTIVADO")
 	else
-		-- Apagar y volver a la normalidad
 		if conexionRender then
 			conexionRender:Disconnect()
 			conexionRender = nil
 		end
 		rootJoint.C0 = originalC0
 		anguloActualY = 0
-		print("Modo invisible/hundido: DESACTIVADO")
 	end
 end
 
--- ==========================================
--- ACTIVACIÓN POR TECLA (Para teclado/celular)
--- ==========================================
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	
-	-- Presiona E para activar o desactivar cuando estés frente al Brainrot
-	if input.KeyCode == TECLA_ACTIVAR then
-		toggleRobo()
-	end
-	
-	-- Ajustar hundimiento en vivo
-	if input.KeyCode == Enum.KeyCode.Down then
-		HUNDIMIENTO_STUDS = HUNDIMIENTO_STUDS + 0.5
-	elseif input.KeyCode == Enum.KeyCode.Up then
-		HUNDIMIENTO_STUDS = math.max(0, HUNDIMIENTO_STUDS - 0.5)
-	end
+-- Crear un botón flotante en pantalla para activar en celular/Delta
+local ScreenGui = Instance.new("ScreenGui")
+local TextButton = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Parent = game:GetService("CoreGui") or player:WaitForChild("PlayerGui")
+TextButton.Parent = ScreenGui
+TextButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TextButton.Position = UDim2.new(0.8, 0, 0.4, 0)
+TextButton.Size = UDim2.new(0, 100, 0, 50)
+TextButton.Text = "ACTIVAR"
+TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextButton.TextSize = 14
+TextButton.Active = true
+TextButton.Draggable = true -- Lo puedes mover con el dedo
+
+UICorner.Parent = TextButton
+
+TextButton.MouseButton1Click:Connect(function()
+	toggleRobo()
+	TextButton.Text = estaRobando and "APAGAR" or "ACTIVAR"
+	TextButton.BackgroundColor3 = estaRobando and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(20, 20, 20)
 end)
